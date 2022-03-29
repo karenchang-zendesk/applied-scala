@@ -19,7 +19,15 @@ class FetchMovieController(fetchMovie: MovieId => IO[Option[Movie]]) extends Htt
     * Hint: You can use `NotFound()` to construct a 404 and `Ok()` to construct a 200.
     * Delegate the error case to the `ErrorHandler`.
     */
-  def fetch(movieId: Long): IO[Response[IO]] =
-    ???
+  def fetch(movieId: Long): IO[Response[IO]] = {
+    val id: MovieId = MovieId(movieId)
+    val fetchedMovie: IO[Option[Movie]] = fetchMovie(id)
+    val fetchedMovieAttempted: IO[Either[Throwable, Option[Movie]]] = fetchedMovie.attempt
 
+    fetchedMovieAttempted.flatMap {
+      case Left(error) => ErrorHandler(error)
+      case Right(Some(movie)) => Ok(movie)
+      case Right(None) => NotFound()
+    }
+  }
 }

@@ -40,7 +40,8 @@ class AppRuntime(config: Config, httpClient: Client[IO]) {
    * all wired up correctly.
    */
   private val fetchMovieController: FetchMovieController = {
-    new FetchMovieController(_ => ???) // Construct a `FetchMovieService`, then fill this out
+    val fetchMovieService: FetchMovieService = new FetchMovieService(pgsqlRepo.fetchMovie)
+    new FetchMovieController(fetchMovieService.fetch)
   }
 
   private val fetchEnrichedMovieController: FetchEnrichedMovieController = {
@@ -60,7 +61,7 @@ class AppRuntime(config: Config, httpClient: Client[IO]) {
 
   private val appRoutes = new AppRoutes(
     fetchAllMoviesHandler = fetchAllMoviesController.fetchAll,
-    fetchMovieHandler = _ => IO(Response[IO](status = Status.NotImplemented)), // Fill this out after constructing `FetchMovieController`
+    fetchMovieHandler = fetchMovieController.fetch,
     fetchEnrichedMovieHandler = fetchEnrichedMovieController.fetch,
     saveMovieHandler = saveMovieController.save,
     saveReviewHandler = saveReviewController.save
