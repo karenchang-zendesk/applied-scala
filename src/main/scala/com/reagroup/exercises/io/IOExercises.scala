@@ -1,6 +1,11 @@
 package com.reagroup.exercises.io
 
 import cats.effect.IO
+import cats.effect.unsafe.implicits.global
+
+// val a: IO[A]
+// a.map(A => B) : IO[B]
+// a.flatMap(A => IO[B]) : IO[B]
 
 /**
   * These exercises are repurposed from https://github.com/lukestephenson/monix-adventures
@@ -11,17 +16,18 @@ import cats.effect.IO
   * Unfortunately, by looking at the type signature alone you do not know precisely what side-effect will be carried out.
   *
   * Here is some comprehensive documentation on `IO`:
-  * https://typelevel.org/cats-effect/datatypes/io.html
+  * https://typelevel.org/cats-effect/docs/2.x/datatypes/io
   */
 object IOExercises {
 
   /**
-    * Create an IO which returns the number 43 and strictly evaluates the argument.
+    * Create an IO which returns the number 43 and eagerly (rather than lazily) evaluates the argument.
     *
-    * Hint: You want to look for a function in IO with the type signature A => IO[A]
+    * Hint: You want to look for a function in IO with the type signature A => IO[A].
+    * Here is some relevant documentation https://typelevel.org/cats-effect/docs/2.x/datatypes/io#describing-effects
     */
   def immediatelyExecutingIO(): IO[Int] =
-    ???
+    IO.pure(43)
 
   /**
     * Create an IO which when executed logs “hello world” (using `logger`)
@@ -35,7 +41,7 @@ object IOExercises {
     * instead of relying on a mocking framework.
     */
   def helloWorld(logger: String => Unit): IO[Unit] =
-    ???
+    IO(logger("hello world"))
 
   /**
     * Difference between `IO.apply` and `IO.pure`:
@@ -51,14 +57,17 @@ object IOExercises {
     */
 
   /**
+    * An IO is a description of a side-effect, and side-effects can potentially fail. So, we need to ba
+    * able to describe failures.
+    *
     * Create an IO which always fails with a `new Exception()`
     *
     * Do NOT use `throw`
     *
-    * Hint: https://typelevel.org/cats-effect/datatypes/io.html#raiseerror
+    * Hint: https://typelevel.org/cats-effect/docs/2.x/datatypes/io#raiseerror
     */
   def alwaysFailingTask(): IO[Unit] =
-    ???
+    IO.raiseError(new Exception)
 
   /**
     * This is a data type that represents an exception in our program.
@@ -72,7 +81,8 @@ object IOExercises {
     * If `msg` is not empty, log out the message using the `logger`
     */
   def logMessageOrFailIfEmpty(msg: String, logger: String => Unit): IO[Unit] =
-    ???
+    if (msg.isEmpty) IO.raiseError(new AppException("Log must not be empty"))
+    else IO(logger(msg))
 
   /**
     * We're going to work with temperature next. We start off by creating tiny types for `Fahrenheit` and `Celsius`.
@@ -92,7 +102,9 @@ object IOExercises {
     * using `cToF` defined above.
     */
   def getCurrentTempInF(getCurrentTemp: IO[Celsius]): IO[Fahrenheit] =
-    ???
+  //    getCurrentTemp.map(celsius => cToF(celsius))
+    getCurrentTemp.map(cToF)
+
 
   /**
     * Suppose the Celsius to Fahrenheit conversion is complex so we have decided to refactor it out to a remote
@@ -105,7 +117,7 @@ object IOExercises {
     * without the need for a mocking framework.
     */
   def getCurrentTempInFAgain(getCurrentTemp: IO[Celsius], converter: Celsius => IO[Fahrenheit]): IO[Fahrenheit] =
-    ???
+    getCurrentTemp.flatMap(converter)
 
 
   /**
@@ -120,10 +132,13 @@ object IOExercises {
     *
     * If unsuccessful, this program should return the error's message (use `.getMessage`).
     *
-    * Hint: https://typelevel.org/cats-effect/datatypes/io.html#attempt
+    * Hint: https://typelevel.org/cats-effect/docs/2.x/datatypes/io#attempt
     */
   def showCurrentTempInF(currentTemp: IO[Celsius], converter: Celsius => IO[Fahrenheit]): IO[String] =
-    ???
+    currentTemp.flatMap(converter).attempt.map {
+      case Left(error) => error.getMessage
+      case Right(temp) => s"The temperature is ${temp.value.toString}"
+    }
 
   /**
     * `UsernameError` and `Username` are tiny types we are going to use for the next exercise.
@@ -141,8 +156,16 @@ object IOExercises {
   /**
     * Use `mkUsername` to create a `Username` and if successful print the username, otherwise fail with a UsernameError.
     */
-  def mkUsernameThenPrint(username: String, logger: String => Unit): IO[Unit] =
-    ???
+  def mkUsernameThenPrint(username: String, logger: String => Unit): IO[Unit] = {
+    //    mkUsername(username) match {
+    //      case Left(error) => IO.raiseError(error)
+    //      case Right(name) => IO(logger(name.value))
+    //    }
+    val errorOrUsername = mkUsername(username)
+    IO
+      .fromEither(errorOrUsername)
+      .flatMap(username => IO(logger(username.value)))
+  }
 
 
   /**
@@ -154,19 +177,19 @@ object IOExercises {
     * > executing step 2
     * > executing step 3
     */
-  def explain(logger: String => Unit): IO[Unit] = {
-    IO(logger("executing step 1"))
-    IO(logger("executing step 2"))
-    IO(logger("executing step 3"))
-  }
+  def explain(logger: String => Unit): IO[Unit] = for {
+    _ <- IO(logger("executing step 1"))
+    _ <- IO(logger("executing step 2"))
+    _ <- IO(logger("executing step 3"))
+  } yield ()
 
   /**
     * Finally, we want to learn how to execute an IO. We are not going to need to do this when writing a REST API however,
     * the library will take care of the IO for you.
     *
-    * Hint: https://typelevel.org/cats-effect/datatypes/io.html#unsaferunsync
+    * Hint: https://typelevel.org/cats-effect/docs/2.x/datatypes/io#unsaferunsync
     */
   def execute[A](io: IO[A]): A =
-    ???
+    io.unsafeRunSync()
 
 }
